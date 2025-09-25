@@ -1,3 +1,6 @@
+> [!NOTE]
+> `react-next` can be found under the [`react-next`](https://github.com/gaymeowing/react-lua/tree/react-next) branch.
+
 # Roact Alignment
 [![Tests](https://github.com/Roblox/roact-alignment/workflows/ci/badge.svg?branch=master)](https://github.com/Roblox/roact-alignment/actions?query=workflow%3ACI+branch%3Amaster)
 [![Coverage Status](https://coveralls.io/repos/github/Roblox/roact-alignment/badge.svg?branch=master&t=TvTSze)](https://coveralls.io/github/Roblox/roact-alignment?branch=master)
