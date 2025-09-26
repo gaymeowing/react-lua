@@ -460,13 +460,13 @@ local function createElement<P, T>(
 		if props.key ~= nil then
 			props.key = nil
 		end
-		if props.ref ~= nil then
+		if props.ref then
 			props.ref = nil
 		end
-		if props.__self ~= nil then
+		if props.__self then
 			props.__self = nil
 		end
-		if props.__source ~= nil then
+		if props.__source then
 			props.__source = nil
 		end
 		-- ROBLOX deviation END
@@ -483,9 +483,9 @@ local function createElement<P, T>(
 		-- ROBLOX TODO: there's a snapshot difference in storeOwners where key is 2 instead of 1 if we do `{...}`. does it matter?
 		-- local childArray = {...}
 		local childArray = table.create(childrenLength)
+
 		for i = 1, childrenLength do
-			local toInsert = select(i, ...)
-			table.insert(childArray, toInsert)
+			childArray[i] = select(i, ...)
 		end
 
 		-- ROBLOX deviation END
@@ -622,9 +622,10 @@ exports.cloneElement = function<P, T>(
 
 	-- Original props are copied
 	local elementProps = element.props
-	local props: P & React_ElementProps<T> = if elementProps ~= nil
-		then table.clone(elementProps :: P & React_ElementProps<T>) :: any
-		else {} :: P & React_ElementProps<T>
+	local props: P & React_ElementProps<T> = if elementProps then
+			table.clone(elementProps :: any) :: any
+		else
+			{} :: P & React_ElementProps<T>
 
 	-- Reserved names are extracted
 	local key = element.key
@@ -642,7 +643,7 @@ exports.cloneElement = function<P, T>(
 	-- Owner will be preserved, unless ref is overridden
 	local owner = element._owner
 
-	if config ~= nil then
+	if config then
 		-- ROBLOX deviation START: inline hasValidRef and hasValidKey success in hot path, still call in error case for warning
 		local configRef = config.ref
 		if configRef ~= nil then
@@ -674,11 +675,75 @@ exports.cloneElement = function<P, T>(
 		then elementType.defaultProps
 		else nil
 
+	if config then
+		if defaultProps then
+			for propName, value in defaultProps :: any do
+				if not RESERVED_PROPS[propName] and not props[propName] then
+					props[propName] = value
+				end
+			end
+		else
+			
+		end
+		end
+
+		for
+	end
+
+	if
+
+		for propName, _ in config :: any do
+			-- this is useless, you cant iterate over nil values
+			-- (config :: any)[propName] ~= nil
+			if not RESERVED_PROPS[propName] then
+				if (config :: any)[propName] == nil and defaultProps ~= nil then
+					-- Resolve default props
+					-- ROBLOX FIXME Luau: force-cast required to avoid TypeError: Expected type table, got 'P' instead
+					(props :: any)[propName] = (defaultProps :: any)[propName]
+				else
+					(props :: any)[propName] = (config :: any)[propName]
+				end
+			end
+		end
+	end
+
+
+	-- Original props are copied
+	if elementProps then
+		props = table.clone(elementProps)
+
+	elseif type(elementType) == "table" and elementType.defaultProps then
+
+	end
+
+	if type(elementType) == "table" and elementType.defaultProps then
+		props = table.clone(defaultProps)
+	end
+
 	-- ROBLOX deviation: cannot call pairs on nil the way you can use `for...in`
 	-- on nil in JS, so we check for nil before iterating
-	if config ~= nil then
+	if config then
+		if defaultProps then
+			for propName in config do
+				local defaultProp =
+			end
+		else
+			for propName in config :: any do
+				if not RESERVED_PROPS[propName] then
+					(props :: any)[propName] = (config :: any)[propName]
+				end
+			end
+		end
+		for defaultProp, defaultValue in defaultProps do
+			if not config[defaultProp] then
+				props[]
+			end
+		end
+
 		for propName, _ in config :: any do
-			if (config :: any)[propName] ~= nil and not RESERVED_PROPS[propName] then
+			-- this is useless, you cant iterate over nil values
+			-- (config :: any)[propName] ~= nil
+			if not RESERVED_PROPS[propName] then
 				if (config :: any)[propName] == nil and defaultProps ~= nil then
 					-- Resolve default props
 					-- ROBLOX FIXME Luau: force-cast required to avoid TypeError: Expected type table, got 'P' instead
