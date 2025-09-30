@@ -7,9 +7,109 @@
 *
 ]]
 
+-- ROBLOX deviation? inline the MinHeap to see if the module-level visibility lets Luau optimize better
+-- local SchedulerMinHeap = require(script.Parent.SchedulerMinHeap)
+-- local push = SchedulerMinHeap.push
+-- local peek = SchedulerMinHeap.peek
+-- local pop = SchedulerMinHeap.pop
+type Heap = { [number]: Node? }
+
+type Node = {
+	id: number,
+	sortIndex: number,
+}
+
+-- ROBLOX deviation: This file contains several workarounds for Luau analysis issues by using the `::` operator
+
+local function compare(a: Node, b: Node): number
+	-- Compare sort index first, then task id.
+	local diff = a.sortIndex - b.sortIndex
+
+	if diff == 0 then
+		return a.id - b.id
+	end
+
+	return diff
+end
+
+local function siftUp(heap: Heap, node: Node, index: number): ()
+	while true do
+		local parentIndex = index // 2
+		local parent = heap[parentIndex]
+
+		if parent and compare(parent :: Node, node :: Node) > 0 then
+			-- The parent is larger. Swap positions.
+			heap[parentIndex] = node
+			heap[index] = parent
+			index = parentIndex
+		else
+			-- The parent is smaller. Exit.
+			return
+		end
+	end
+end
+
+local function siftDown(heap: Heap, node: Node, index: number): ()
+	local length = #heap
+
+	while index < length do
+		local leftIndex = index * 2
+		local left = heap[leftIndex]
+		local rightIndex = leftIndex + 1
+		local right = heap[rightIndex]
+
+		-- If the left or right node is smaller, swap with the smaller of those.
+		if left ~= nil and compare(left :: Node, node) < 0 then
+			if right ~= nil and compare(right :: Node, left :: Node) < 0 then
+				heap[index] = right
+				heap[rightIndex] = node
+				index = rightIndex
+			else
+				heap[index] = left
+				heap[leftIndex] = node
+				index = leftIndex
+			end
+		elseif right ~= nil and compare(right :: Node, node :: Node) < 0 then
+			heap[index] = right
+			heap[rightIndex] = node
+			index = rightIndex
+		else
+			-- Neither child is smaller. Exit.
+			return
+		end
+	end
+end
+
+local function push(heap: Heap, node: Node): ()
+	local index = #heap + 1
+	heap[index] = node
+
+	siftUp(heap, node, index)
+end
+
+local function peek(heap: Heap): Node?
+	return heap[1]
+end
+
+local function pop(heap: Heap): Node?
+	local first = peek(heap)
+	if first ~= nil then
+		local last = heap[#heap]
+		heap[#heap] = nil
+
+		if last :: Node ~= first :: Node then
+			heap[1] = last
+			siftDown(heap, last :: Node, 1)
+		end
+		return first
+	else
+		return nil
+	end
+end
+
 -- ROBLOX deviation: return an initializer function instead of the module itself
 -- for easier dependency injection with unstable_mock
-return function(hostConfig)
+return function(hostConfig: typeof(require(script.Parent.SchedulerHostConfig)))
 	local Packages = script.Parent.Parent
 	local ReactGlobals = require(Packages.ReactGlobals)
 	local describeError = require(Packages.Shared).describeError
@@ -28,104 +128,6 @@ return function(hostConfig)
 	local requestPaint = SchedulerHostConfig.requestPaint
 	local setSchedulerFlags = SchedulerHostConfig.setSchedulerFlags
 	local getSchedulerFlags = SchedulerHostConfig.getSchedulerFlags
-
-	-- ROBLOX deviation? inline the MinHeap to see if the module-level visibility lets Luau optimize better
-	-- local SchedulerMinHeap = require(script.Parent.SchedulerMinHeap)
-	-- local push = SchedulerMinHeap.push
-	-- local peek = SchedulerMinHeap.peek
-	-- local pop = SchedulerMinHeap.pop
-	type Heap = { [number]: Node? }
-	type Node = {
-		id: number,
-		sortIndex: number,
-	}
-
-	-- ROBLOX deviation: This file contains several workarounds for Luau analysis issues by using the `::` operator
-	local compare, siftUp, siftDown
-
-	local push = function(heap: Heap, node: Node): ()
-		local index = #heap + 1
-		heap[index] = node
-
-		siftUp(heap, node, index)
-	end
-
-	local peek = function(heap: Heap): Node?
-		return heap[1]
-	end
-
-	local pop = function(heap: Heap): Node?
-		local first = heap[1]
-		if first ~= nil then
-			local last = heap[#heap]
-			heap[#heap] = nil
-
-			if last :: Node ~= first :: Node then
-				heap[1] = last
-				siftDown(heap, last :: Node, 1)
-			end
-			return first
-		else
-			return nil
-		end
-	end
-
-	siftUp = function(heap: Heap, node: Node, index: number): ()
-		while true do
-			local parentIndex = math.floor(index / 2)
-			local parent = heap[parentIndex]
-			if parent ~= nil and compare(parent :: Node, node :: Node) > 0 then
-				-- The parent is larger. Swap positions.
-				heap[parentIndex] = node
-				heap[index] = parent
-				index = parentIndex
-			else
-				-- The parent is smaller. Exit.
-				return
-			end
-		end
-	end
-
-	siftDown = function(heap: Heap, node: Node, index: number): ()
-		local length = #heap
-		while index < length do
-			local leftIndex = index * 2
-			local left = heap[leftIndex]
-			local rightIndex = leftIndex + 1
-			local right = heap[rightIndex]
-
-			-- If the left or right node is smaller, swap with the smaller of those.
-			if left ~= nil and compare(left :: Node, node) < 0 then
-				if right ~= nil and compare(right :: Node, left :: Node) < 0 then
-					heap[index] = right
-					heap[rightIndex] = node
-					index = rightIndex
-				else
-					heap[index] = left
-					heap[leftIndex] = node
-					index = leftIndex
-				end
-			elseif right ~= nil and compare(right :: Node, node :: Node) < 0 then
-				heap[index] = right
-				heap[rightIndex] = node
-				index = rightIndex
-			else
-				-- Neither child is smaller. Exit.
-				return
-			end
-		end
-	end
-
-	compare = function(a: Node, b: Node): number
-		-- Compare sort index first, then task id.
-		local diff = a.sortIndex - b.sortIndex
-
-		if diff == 0 then
-			return a.id - b.id
-		end
-
-		return diff
-	end
 
 	-- TODO: Use symbols?
 	local SchedulerPriorities = require(script.Parent.SchedulerPriorities)
@@ -244,25 +246,20 @@ return function(hostConfig)
 
 		-- ROBLOX deviation: YOLO flag for disabling pcall
 		local ok, result
-		if not ReactGlobals.__YOLO__ then
+		if enableProfiling and not ReactGlobals.__YOLO__ then
 			-- ROBLOX performance: don't nest try/catch here, Lua can do better, and it eliminated an anon function creation
-			if enableProfiling then
-				ok, result =
-					xpcall(workLoop, describeError, hasTimeRemaining, initialTime)
+			ok, result =
+				xpcall(workLoop, describeError, hasTimeRemaining, initialTime)
 
-				if not ok then
-					if currentTask ~= nil then
-						local currentTime = getCurrentTime()
-						markTaskErrored(currentTask, currentTime)
-						currentTask.isQueued = false
-					end
+			if not ok then
+				if currentTask ~= nil then
+					local currentTime = getCurrentTime()
+					markTaskErrored(currentTask, currentTime)
+					currentTask.isQueued = false
 				end
-			else
-				-- No catch in prod code path.
-				ok = true
-				result = workLoop(hasTimeRemaining, initialTime)
 			end
 		else
+			-- No catch in prod code path.
 			ok = true
 			result = workLoop(hasTimeRemaining, initialTime)
 		end
@@ -299,14 +296,15 @@ return function(hostConfig)
 			end
 
 			local callback = currentTask.callback
-			if typeof(callback) == "function" then
+			if type(callback) == "function" then
 				currentTask.callback = nil
 				currentPriorityLevel = currentTask.priorityLevel
 				local didUserCallbackTimeout = currentTask.expirationTime <= currentTime
 				markTaskRun(currentTask, currentTime)
 				local continuationCallback = callback(didUserCallbackTimeout)
 				currentTime = getCurrentTime()
-				if typeof(continuationCallback) == "function" then
+
+				if type(continuationCallback) == "function" then
 					currentTask.callback = continuationCallback
 					markTaskYield(currentTask, currentTime)
 				else
@@ -360,17 +358,16 @@ return function(hostConfig)
 		local ok, result
 		if not ReactGlobals.__YOLO__ then
 			ok, result = xpcall(eventHandler, describeError)
+
+			if not ok then
+				error(result)
+			end
 		else
-			ok = true
 			result = eventHandler()
 		end
 
 		-- ROBLOX: finally
 		currentPriorityLevel = previousPriorityLevel
-
-		if not ok then
-			error(result)
-		end
 
 		return result
 	end
@@ -396,18 +393,16 @@ return function(hostConfig)
 		local ok, result
 		if not ReactGlobals.__YOLO__ then
 			ok, result = xpcall(eventHandler, describeError)
+
+			if not ok then
+				error(result)
+			end
 		else
-			ok = true
 			result = eventHandler()
 		end
 
 		-- ROBLOX: finally
 		currentPriorityLevel = previousPriorityLevel
-
-		if not ok then
-			error(result)
-		end
-
 		return result
 	end
 
@@ -423,17 +418,16 @@ return function(hostConfig)
 			local ok, result
 			if not ReactGlobals.__YOLO__ then
 				ok, result = xpcall(callback, describeError, ...)
+
+				if not ok then
+					error(result)
+				end
 			else
-				ok = true
 				result = callback(...)
 			end
 
 			-- ROBLOX: finally
 			currentPriorityLevel = previousPriorityLevel
-
-			if not ok then
-				error(result)
-			end
 
 			return result
 		end
@@ -577,15 +571,11 @@ return function(hostConfig)
 		unstable_forceFrameRate = forceFrameRate,
 		unstable_setSchedulerFlags = setSchedulerFlags,
 		unstable_getSchedulerFlags = getSchedulerFlags,
-		-- ROBLOX TODO: use if-expressions when all clients are on 503+
-		unstable_Profiling = (function()
-			if enableProfiling then
-				return {
-					startLoggingProfilingEvents = startLoggingProfilingEvents,
-					stopLoggingProfilingEvents = stopLoggingProfilingEvents,
-				}
-			end
-			return nil
-		end)(),
+		unstable_Profiling = if enableProfiling
+			then {
+				startLoggingProfilingEvents = startLoggingProfilingEvents,
+				stopLoggingProfilingEvents = stopLoggingProfilingEvents,
+			}
+			else nil,
 	}
 end

@@ -275,22 +275,21 @@ local function performWorkUntilDeadline()
 		end
 		if not ReactGlobals.__YOLO__ then
 			ok, result = xpcall(doWork, describeError)
+
+			if not ok then
+				-- If a scheduler task throws, exit the current coroutine so the
+				-- error can be observed.
+				task.delay(0, performWorkUntilDeadline)
+				if FFlagReactSchedulerSetFrameMarkerOnHeartbeatEnd then
+					task.defer(setFrameMarker)
+				end
+
+				-- ROBLOX FIXME: the top-level Luau VM handler doesn't deal with
+				-- non-string errors, so massage it until VM support lands
+				error(errorToString(result :: any))
+			end
 		else
 			result = doWork()
-			ok = true
-		end
-
-		if not ok then
-			-- If a scheduler task throws, exit the current coroutine so the
-			-- error can be observed.
-			task.delay(0, performWorkUntilDeadline)
-			if FFlagReactSchedulerSetFrameMarkerOnHeartbeatEnd then
-				task.defer(setFrameMarker)
-			end
-
-			-- ROBLOX FIXME: the top-level Luau VM handler doesn't deal with
-			-- non-string errors, so massage it until VM support lands
-			error(errorToString(result :: any))
 		end
 	else
 		isMessageLoopRunning = false
@@ -303,6 +302,7 @@ local function wrapPerformWorkWithCoroutine(performWork)
 		while true do
 			-- We wrap `performWork` with a coroutine so that it can yield internally
 			-- but not implicitly yield the entire `co` coroutine
+			local thread = coroutine.create(f)
 			local wrapped = coroutine.wrap(performWork)
 			local ok, result = pcall(wrapped)
 			coroutine.yield(ok, result)
