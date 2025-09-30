@@ -147,7 +147,7 @@ local React = {
 }
 
 -- ROBLOX deviation: bindings universal subscriber
-@[deprecated{ use = "Binding:_subscribe()" }]
+@[deprecated{ use = "ReactBinding:_subscribe()" }]
 function React.__subscribeToBinding<V>(
 	binding: ReactBinding<V>,
 	f: (value: V) -> ()
